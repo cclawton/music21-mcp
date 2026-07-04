@@ -38,6 +38,19 @@ def test_tool_registry_has_phase_2_tools():
         assert tool_name in _tool_registry, f"Missing Phase 2 tool: {tool_name}"
 
 
+def test_tool_registry_has_phase_3_tools():
+    """Registry should contain all 5 Phase 3 tools."""
+    expected_p3 = [
+        "analyze_chord_progression",
+        "extract_melody",
+        "detect_modulations",
+        "analyze_form",
+        "search_pattern",
+    ]
+    for tool_name in expected_p3:
+        assert tool_name in _tool_registry, f"Missing Phase 3 tool: {tool_name}"
+
+
 def test_tool_registry_has_descriptions():
     """Each tool should have a description string."""
     for name, tool_def in _tool_registry.items():

@@ -21,6 +21,11 @@ from .tools.merge_midi import merge_midi
 from .tools.quantize_midi import quantize_midi
 from .tools.reharmonize import reharmonize
 from .tools.harmonize_melody import harmonize_melody
+from .tools.analyze_chord_progression import analyze_chord_progression
+from .tools.extract_melody import extract_melody
+from .tools.detect_modulations import detect_modulations
+from .tools.analyze_form import analyze_form
+from .tools.search_pattern import search_pattern
 
 mcp = FastMCP("music21-mcp")
 
@@ -70,6 +75,26 @@ _tool_registry: dict[str, dict] = {
     "harmonize_melody": {
         "description": "Generate chord accompaniment for a melody line.",
         "fn": harmonize_melody,
+    },
+    "analyze_chord_progression": {
+        "description": "Identify chords and Roman numerals in a progression.",
+        "fn": analyze_chord_progression,
+    },
+    "extract_melody": {
+        "description": "Extract the melody line (highest pitch) from a multi-part score.",
+        "fn": extract_melody,
+    },
+    "detect_modulations": {
+        "description": "Detect key changes (modulations) within a piece.",
+        "fn": detect_modulations,
+    },
+    "analyze_form": {
+        "description": "Analyze song structure — identify sections (A, B, A', etc.).",
+        "fn": analyze_form,
+    },
+    "search_pattern": {
+        "description": "Search for melodic patterns by exact pitch or interval sequence.",
+        "fn": search_pattern,
     },
 }
 
@@ -463,6 +488,126 @@ def mcp_harmonize_melody(
             "style": style,
             "summary": f"Added {chord_count} chords ({style} style), saved to {output_path}",
         })
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@mcp.tool()
+def mcp_analyze_chord_progression(file_path: str) -> str:
+    """Analyze the chord progression of a MIDI file.
+
+    Args:
+        file_path: Path to the .mid file
+
+    Returns:
+        JSON with key, progression (Roman numerals + chord names), and summary
+    """
+    try:
+        stream_obj = parse_midi_file(file_path)
+        result = analyze_chord_progression(stream_obj)
+        result["file_path"] = file_path
+        return json.dumps(result)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@mcp.tool()
+def mcp_extract_melody(file_path: str, output_path: str | None = None) -> str:
+    """Extract the melody line from a MIDI file.
+
+    Args:
+        file_path: Path to the .mid file
+        output_path: Optional path to save extracted melody as MIDI
+
+    Returns:
+        JSON with note count, pitch range, and summary
+    """
+    try:
+        stream_obj = parse_midi_file(file_path)
+        melody = extract_melody(stream_obj)
+        note_count = len(list(melody.flatten().notes))
+
+        if output_path and note_count > 0:
+            export_midi(melody, output_path)
+
+        return json.dumps({
+            "success": True,
+            "note_count": note_count,
+            "output_path": output_path,
+            "summary": f"Extracted {note_count} melody notes",
+        })
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@mcp.tool()
+def mcp_detect_modulations(file_path: str, window_size: int = 8) -> str:
+    """Detect key changes (modulations) in a MIDI file.
+
+    Args:
+        file_path: Path to the .mid file
+        window_size: Notes per analysis window (default: 8)
+
+    Returns:
+        JSON with list of modulations (from_key, to_key, offset) and summary
+    """
+    try:
+        stream_obj = parse_midi_file(file_path)
+        result = detect_modulations(stream_obj, window_size=window_size)
+        result["file_path"] = file_path
+        return json.dumps(result)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@mcp.tool()
+def mcp_analyze_form(file_path: str, window_size: int = 8) -> str:
+    """Analyze the structural form of a MIDI file.
+
+    Args:
+        file_path: Path to the .mid file
+        window_size: Notes per analysis window (default: 8)
+
+    Returns:
+        JSON with sections (label, start/end offset) and summary
+    """
+    try:
+        stream_obj = parse_midi_file(file_path)
+        result = analyze_form(stream_obj, window_size=window_size)
+        result["file_path"] = file_path
+        return json.dumps(result)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@mcp.tool()
+def mcp_search_pattern(
+    file_path: str,
+    pattern: str,
+    pattern_type: str = "pitches",
+) -> str:
+    """Search for a melodic pattern in a MIDI file.
+
+    Args:
+        file_path: Path to the .mid file
+        pattern: Comma-separated pattern. For 'pitches' mode: note names (e.g. "C4,D4,E4").
+                 For 'intervals' mode: semitone intervals (e.g. "2,2")
+        pattern_type: 'pitches' or 'intervals'
+
+    Returns:
+        JSON with list of matches (offset, notes) and summary
+    """
+    try:
+        stream_obj = parse_midi_file(file_path)
+
+        if pattern_type == "pitches":
+            pattern_list = [p.strip() for p in pattern.split(",")]
+        else:
+            pattern_list = [int(x.strip()) for x in pattern.split(",")]
+
+        result = search_pattern(stream_obj, pattern=pattern_list, pattern_type=pattern_type)
+        result["file_path"] = file_path
+        return json.dumps(result)
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
 
