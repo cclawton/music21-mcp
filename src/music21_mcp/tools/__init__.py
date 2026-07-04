@@ -1,0 +1,1 @@
+"""MCP tools for music21 MIDI operations."""
