@@ -1,224 +1,386 @@
 """
-music21 MCP Server — exposes music21 tools via Model Context Protocol
+music21 MCP Server — exposes music21 tools via Model Context Protocol.
+
+The MCP tools accept JSON-serializable inputs (file paths, strings, ints)
+and internally handle conversion to/from music21 streams.
 """
 
 from __future__ import annotations
+
 import json
 from mcp.server.fastmcp import FastMCP
 
-from .tools import (
-    analyze_key,
-    parse_midi_file,
-    export_midi,
-    transpose_midi,
-    modify_notes,
-    change_velocity,
-    replace_chord_at,
-    merge_midi,
-    quantize_midi,
-)
+from .tools.parse_midi import parse_midi_file
+from .tools.analyze_key import analyze_key
+from .tools.export_midi import export_midi
+from .tools.transpose_midi import transpose_midi
+from .tools.change_velocity import change_velocity
+from .tools.modify_notes import modify_notes
+from .tools.replace_chord_at import replace_chord_at
+from .tools.merge_midi import merge_midi
+from .tools.quantize_midi import quantize_midi
 
 mcp = FastMCP("music21-mcp")
 
+# Tool registry: maps tool name -> {description, fn}
+# fn here is the raw tool function (not the MCP wrapper)
+_tool_registry: dict[str, dict] = {
+    "parse_midi_file": {
+        "description": "Load a MIDI file and return a music21 stream for further processing.",
+        "fn": parse_midi_file,
+    },
+    "analyze_key": {
+        "description": "Analyze the key of a music21 stream. Returns key, mode, and confidence.",
+        "fn": analyze_key,
+    },
+    "export_midi": {
+        "description": "Export a music21 stream to a MIDI file.",
+        "fn": export_midi,
+    },
+    "transpose_midi": {
+        "description": "Transpose a stream by semitones or to a target key.",
+        "fn": transpose_midi,
+    },
+    "change_velocity": {
+        "description": "Adjust MIDI velocity (dynamics) of notes: scale, absolute, or offset.",
+        "fn": change_velocity,
+    },
+    "modify_notes": {
+        "description": "Filter/remove/select/shift notes by pitch criteria.",
+        "fn": modify_notes,
+    },
+    "replace_chord_at": {
+        "description": "Replace a chord at a specific bar/beat position.",
+        "fn": replace_chord_at,
+    },
+    "merge_midi": {
+        "description": "Overlay two streams into a single stream or multi-part score.",
+        "fn": merge_midi,
+    },
+    "quantize_midi": {
+        "description": "Snap note timings to a rhythmic grid (quarter, eighth, sixteenth).",
+        "fn": quantize_midi,
+    },
+}
+
+
+# --- MCP Tool Wrappers ---
+# These accept file paths and JSON-serializable args, convert to streams,
+# call the underlying tool, and return JSON strings.
+
 
 @mcp.tool()
-def tool_analyze_key(source: str, detail: bool = False) -> str:
-    """Detect the most likely key of a MIDI file or note sequence.
+def mcp_parse_midi_file(file_path: str) -> str:
+    """Parse a MIDI file into a music21 stream.
 
     Args:
-        source: MIDI file path OR comma-separated note names (e.g. 'C4,E4,G4,F4,A4,C5')
-        detail: Include detailed pitch class distribution (default: false)
+        file_path: Path to the .mid file
 
     Returns:
-        JSON with key, confidence, alternatives, and summary
+        JSON with success status and basic stream info (note count, duration)
     """
-    return json.dumps(analyze_key(source, detail))
+    try:
+        stream_obj = parse_midi_file(file_path)
+        notes = list(stream_obj.flatten().notes)
+        return json.dumps({
+            "success": True,
+            "file_path": file_path,
+            "note_count": len(notes),
+            "summary": f"Parsed {len(notes)} notes from {file_path}",
+        })
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
 
 
 @mcp.tool()
-def tool_parse_midi_file(
-    file_path: str, extract_notes: bool = False, part_index: int | None = None
-) -> str:
-    """Parse a MIDI file and return its structure: parts, tracks, tempo, time signature, key signatures, note count, duration.
+def mcp_analyze_key(file_path: str) -> str:
+    """Detect the key of a MIDI file.
 
     Args:
-        file_path: Path to MIDI file
-        extract_notes: Include note list per part (default: false, returns counts only)
-        part_index: Optional, analyze specific part only
+        file_path: Path to the .mid file
 
     Returns:
-        JSON with tempo, time_signature, duration, parts, and summary
+        JSON with key, mode, confidence, and summary
     """
-    return json.dumps(parse_midi_file(file_path, extract_notes, part_index))
+    try:
+        stream_obj = parse_midi_file(file_path)
+        result = analyze_key(stream_obj)
+        result["success"] = True
+        result["file_path"] = file_path
+        result["summary"] = f"Key: {result['key']} (confidence: {result['confidence']})"
+        return json.dumps(result)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
 
 
 @mcp.tool()
-def tool_export_midi(
-    notes: str,
-    key_str: str | None = None,
-    tempo_bpm: int = 120,
-    time_signature: str = "4/4",
-    output_path: str = "output.mid",
-) -> str:
-    """Create a MIDI file from a note sequence, chord progression, or Roman numeral progression.
+def mcp_export_midi(file_path: str, output_path: str) -> str:
+    """Export a parsed MIDI stream to a new file (use after modifications).
+
+    Note: This is a placeholder — in practice, modifications return streams
+    that can be saved. Use mcp_transpose_midi etc. which have output_path.
 
     Args:
-        notes: Note names with optional durations (e.g. 'C4:q,E4:q,G4:q' or 'C4:1,E4:0.5,G4:0.5')
-        key_str: Optional key for Roman numeral input (e.g. 'C major')
-        tempo_bpm: BPM (default: 120)
-        time_signature: e.g. '4/4' (default: '4/4')
+        file_path: Source MIDI file to re-export
         output_path: Where to save the MIDI file
 
     Returns:
-        JSON with file_path, note_count, duration, and summary
+        JSON with success status and output path
     """
-    return json.dumps(export_midi(notes, key_str, tempo_bpm, time_signature, output_path))
+    try:
+        stream_obj = parse_midi_file(file_path)
+        result = export_midi(stream_obj, output_path)
+        result["summary"] = f"Exported to {output_path}"
+        return json.dumps(result)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
 
 
 @mcp.tool()
-def tool_transpose_midi(
+def mcp_transpose_midi(
     file_path: str,
     semitones: int | None = None,
     target_key: str | None = None,
-    output_path: str = "transposed.mid",
+    output_path: str | None = None,
 ) -> str:
-    """Transpose an existing MIDI file by semitones or to a target key.
+    """Transpose a MIDI file by semitones or to a target key.
 
     Args:
         file_path: Path to input MIDI file
-        semitones: Number of semitones (mutually exclusive with target_key)
-        target_key: Target key (e.g. 'D major')
-        output_path: Where to save transposed MIDI
+        semitones: Number of semitones to transpose (can be negative)
+        target_key: Target key name (e.g. "F", "Bb") — alternative to semitones
+        output_path: Optional output path. If omitted, overwrites input.
 
     Returns:
-        JSON with file_path, original_key, new_key, and summary
+        JSON with success status, original key, and new key
     """
-    return json.dumps(transpose_midi(file_path, semitones, target_key, output_path))
+    try:
+        stream_obj = parse_midi_file(file_path)
+        original_key = analyze_key(stream_obj)
+
+        transposed = transpose_midi(stream_obj, semitones=semitones, target_key=target_key)
+        new_key = analyze_key(transposed)
+
+        if output_path is None:
+            output_path = file_path.replace(".mid", "_transposed.mid")
+        export_midi(transposed, output_path)
+
+        return json.dumps({
+            "success": True,
+            "output_path": output_path,
+            "original_key": original_key["key"],
+            "new_key": new_key["key"],
+            "summary": f"Transposed from {original_key['key']} to {new_key['key']}",
+        })
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
 
 
 @mcp.tool()
-def tool_modify_notes(
+def mcp_change_velocity(
     file_path: str,
-    operations: str,
-    output_path: str = "modified.mid",
-    part_index: int | None = None,
+    scale: float | None = None,
+    absolute: int | None = None,
+    offset: int | None = None,
+    output_path: str | None = None,
 ) -> str:
-    """Modify notes in a MIDI file by criteria: pitch range, velocity, timing, or specific bar/beat.
+    """Adjust velocity (dynamics) of a MIDI file.
 
     Args:
         file_path: Path to input MIDI file
-        operations: JSON array of modification operations. Each operation has a "type" field:
-            - {"type": "remove_below", "pitch": "C3"}
-            - {"type": "remove_above", "pitch": "C6"}
-            - {"type": "scale_velocity", "factor": 1.2}
-            - {"type": "set_velocity", "min": 40, "max": 100, "value": 80}
-            - {"type": "add_note", "pitch": "G3", "duration": 1.0, "velocity": 90}
-        output_path: Where to save modified MIDI
-        part_index: Optional, apply to specific part only (default: all parts)
+        scale: Multiply all velocities by this factor (e.g. 1.5 = 150%)
+        absolute: Set all velocities to this exact value
+        offset: Add this to all velocities (can be negative)
+        output_path: Optional output path
 
     Returns:
-        JSON with file_path, changes_made, and summary
+        JSON with success status and notes changed
     """
-    ops = json.loads(operations) if isinstance(operations, str) else operations
-    return json.dumps(modify_notes(file_path, ops, output_path, part_index))
+    try:
+        stream_obj = parse_midi_file(file_path)
+        result_stream = change_velocity(stream_obj, scale=scale, absolute=absolute, offset=offset)
+
+        if output_path is None:
+            output_path = file_path.replace(".mid", "_velocity.mid")
+        export_midi(result_stream, output_path)
+
+        note_count = len(list(result_stream.flatten().notes))
+        return json.dumps({
+            "success": True,
+            "output_path": output_path,
+            "notes_changed": note_count,
+            "summary": f"Adjusted velocity of {note_count} notes, saved to {output_path}",
+        })
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
 
 
 @mcp.tool()
-def tool_change_velocity(
+def mcp_modify_notes(
     file_path: str,
-    mode: str = "scale",
-    factor: float = 1.0,
-    min_velocity: int = 1,
-    max_velocity: int = 127,
-    fade_from: int = 80,
-    fade_to: int = 100,
-    output_path: str = "velocity_changed.mid",
+    action: str = "remove",
+    filter_below: str | None = None,
+    filter_above: str | None = None,
+    octave_shift: int | None = None,
+    output_path: str | None = None,
 ) -> str:
-    """Adjust note velocities (dynamics) in a MIDI file.
+    """Modify notes in a MIDI file by pitch criteria.
 
     Args:
         file_path: Path to input MIDI file
-        mode: 'scale' (multiply all by factor), 'set_range' (clamp to min/max), 'fade' (gradual change)
-        factor: For 'scale' mode (e.g. 1.2 = 20% louder)
-        min_velocity: For 'set_range' mode (0-127)
-        max_velocity: For 'set_range' mode (0-127)
-        fade_from: For 'fade' mode (start velocity)
-        fade_to: For 'fade' mode (end velocity)
-        output_path: Where to save modified MIDI
+        action: 'remove', 'select', or 'shift_octave'
+        filter_below: Remove/select notes below this pitch (e.g. "C4")
+        filter_above: Remove/select notes above this pitch (e.g. "G5")
+        octave_shift: Octaves to shift (for 'shift_octave' action)
+        output_path: Optional output path
 
     Returns:
-        JSON with file_path, notes_changed, and summary
+        JSON with success status and remaining note count
     """
-    return json.dumps(
-        change_velocity(file_path, mode, factor, min_velocity, max_velocity, fade_from, fade_to, output_path)
-    )
+    try:
+        stream_obj = parse_midi_file(file_path)
+        original_count = len(list(stream_obj.flatten().notes))
+
+        result_stream = modify_notes(
+            stream_obj,
+            action=action,
+            filter_below=filter_below,
+            filter_above=filter_above,
+            octave_shift=octave_shift,
+        )
+
+        new_count = len(list(result_stream.flatten().notes))
+
+        if output_path is None:
+            output_path = file_path.replace(".mid", "_modified.mid")
+        export_midi(result_stream, output_path)
+
+        return json.dumps({
+            "success": True,
+            "output_path": output_path,
+            "original_notes": original_count,
+            "remaining_notes": new_count,
+            "summary": f"{action}: {original_count} → {new_count} notes, saved to {output_path}",
+        })
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
 
 
 @mcp.tool()
-def tool_replace_chord_at(
+def mcp_replace_chord_at(
     file_path: str,
     bar: int,
     beat: int,
     new_chord: str,
-    duration: float = 1.0,
-    output_path: str = "chord_replaced.mid",
+    output_path: str | None = None,
 ) -> str:
-    """Replace the chord at a specific bar and beat in a MIDI file.
+    """Replace a chord at a specific bar/beat in a MIDI file.
 
     Args:
         file_path: Path to input MIDI file
-        bar: 1-indexed bar number
+        bar: Bar number (1-indexed)
         beat: Beat within the bar (1-indexed)
-        new_chord: Chord name (e.g. 'G7', 'Cmaj7', 'Am') or note names (e.g. 'G4,B4,D5,F5')
-        duration: Duration in beats (default: 1.0)
-        output_path: Where to save modified MIDI
+        new_chord: Comma-separated pitch names (e.g. "G3,B3,D4,F4")
+        output_path: Optional output path
 
     Returns:
-        JSON with file_path, original_chord, new_chord, and summary
+        JSON with success status and chord info
     """
-    return json.dumps(replace_chord_at(file_path, bar, beat, new_chord, duration, output_path))
+    try:
+        chord_pitches = [p.strip() for p in new_chord.split(",")]
+        stream_obj = parse_midi_file(file_path)
+
+        result_stream = replace_chord_at(stream_obj, bar=bar, beat=beat, new_chord=chord_pitches)
+
+        if output_path is None:
+            output_path = file_path.replace(".mid", "_replaced.mid")
+        export_midi(result_stream, output_path)
+
+        return json.dumps({
+            "success": True,
+            "output_path": output_path,
+            "bar": bar,
+            "beat": beat,
+            "new_chord": new_chord,
+            "summary": f"Replaced chord at bar {bar} beat {beat} with [{new_chord}]",
+        })
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
 
 
 @mcp.tool()
-def tool_merge_midi(
+def mcp_merge_midi(
     file_a: str,
     file_b: str,
-    output_path: str = "merged.mid",
-    offset_beats: float = 0.0,
+    output_parts: bool = False,
+    output_path: str | None = None,
 ) -> str:
-    """Merge two MIDI files into one. Overlays the second file's tracks onto the first.
+    """Merge (overlay) two MIDI files into one.
 
     Args:
-        file_a: Base MIDI file path
-        file_b: MIDI file to overlay
-        output_path: Where to save merged MIDI
-        offset_beats: Shift file_b by this many beats (default: 0)
+        file_a: Path to first MIDI file (e.g. melody)
+        file_b: Path to second MIDI file (e.g. bass)
+        output_parts: If true, create multi-part score; if false, flat merge
+        output_path: Optional output path
 
     Returns:
-        JSON with file_path, tracks_a, tracks_b, total_tracks, and summary
+        JSON with success status and note count
     """
-    return json.dumps(merge_midi(file_a, file_b, output_path, offset_beats))
+    try:
+        stream_a = parse_midi_file(file_a)
+        stream_b = parse_midi_file(file_b)
+
+        result = merge_midi(stream_a, stream_b, output_parts=output_parts)
+
+        if output_path is None:
+            output_path = file_a.replace(".mid", "_merged.mid")
+        export_midi(result, output_path)
+
+        note_count = len(list(result.flatten().notes))
+        return json.dumps({
+            "success": True,
+            "output_path": output_path,
+            "total_notes": note_count,
+            "summary": f"Merged {file_a} + {file_b} → {note_count} notes, saved to {output_path}",
+        })
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
 
 
 @mcp.tool()
-def tool_quantize_midi(
+def mcp_quantize_midi(
     file_path: str,
-    grid: str = "16th",
-    swing: float = 0.0,
-    output_path: str = "quantized.mid",
+    grid: str = "sixteenth",
+    output_path: str | None = None,
 ) -> str:
     """Quantize note timings in a MIDI file to a rhythmic grid.
 
     Args:
         file_path: Path to input MIDI file
-        grid: Quantization grid: '16th', '8th', 'quarter', '32nd' (default: '16th')
-        swing: Swing amount 0-1 (0 = straight, 0.5 = triplet feel, default: 0)
-        output_path: Where to save quantized MIDI
+        grid: Grid resolution: 'quarter', 'eighth', or 'sixteenth'
+        output_path: Optional output path
 
     Returns:
-        JSON with file_path, notes_adjusted, max_adjustment, and summary
+        JSON with success status and notes quantized
     """
-    return json.dumps(quantize_midi(file_path, grid, swing, output_path))
+    try:
+        stream_obj = parse_midi_file(file_path)
+        result = quantize_midi(stream_obj, grid=grid)
+
+        if output_path is None:
+            output_path = file_path.replace(".mid", "_quantized.mid")
+        export_midi(result, output_path)
+
+        note_count = len(list(result.flatten().notes))
+        return json.dumps({
+            "success": True,
+            "output_path": output_path,
+            "notes_quantized": note_count,
+            "grid": grid,
+            "summary": f"Quantized {note_count} notes to {grid} grid, saved to {output_path}",
+        })
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
 
 
 if __name__ == "__main__":

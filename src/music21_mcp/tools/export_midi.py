@@ -23,6 +23,21 @@ def export_midi(score: stream.Stream, filepath: str) -> dict:
     path = Path(filepath)
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    score.write("midi", fp=str(path))
+    # Ensure the stream has measures — music21's MIDI writer needs them
+    # to process repeats correctly. makeNotation() adds measures, ties, etc.
+    try:
+        score.write("midi", fp=str(path))
+    except Exception:
+        # If write fails (e.g. "cannot process repeats"), try making measures
+        try:
+            with_measures = score.makeNotation()
+            with_measures.write("midi", fp=str(path))
+        except Exception:
+            # Last resort: strip metadata and write bare
+            bare = stream.Stream()
+            for elem in score.flatten():
+                bare.append(elem)
+            scored = bare.makeNotation()
+            scored.write("midi", fp=str(path))
 
     return {"success": True, "path": str(path)}

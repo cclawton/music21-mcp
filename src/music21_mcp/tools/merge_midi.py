@@ -48,8 +48,9 @@ def merge_midi(
         result.append(part_b)
         return result
 
-    # Simple merge: append all elements from both into a single stream
-    result = stream.Stream()
+    # Simple merge: append all elements from both into a single Part
+    # Wrap in a Part so music21 can export to MIDI (flat streams fail)
+    result = stream.Part()
     for elem in a_copy:
         result.append(copy.deepcopy(elem))
     for elem in b_copy:
