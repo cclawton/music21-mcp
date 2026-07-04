@@ -42,7 +42,7 @@ Give an AI agent a MIDI file and it can:
 ### Install
 
 ```bash
-cd ~/Hacking/music21-mcp
+cd music21-mcp
 
 # Create and activate venv
 python3 -m venv venv
@@ -82,7 +82,7 @@ To configure in an MCP client, add to your client's MCP config:
     "music21-mcp": {
       "command": "python",
       "args": ["-m", "music21_mcp.server"],
-      "cwd": "/Users/craiglawton/Hacking/music21-mcp"
+      "cwd": "/path/to/music21-mcp"
     }
   }
 }
@@ -94,7 +94,7 @@ Or if using the project venv:
 {
   "mcpServers": {
     "music21-mcp": {
-      "command": "/Users/craiglawton/Hacking/music21-mcp/venv/bin/python",
+      "command": "/path/to/music21-mcp/venv/bin/python",
       "args": ["-m", "music21_mcp.server"]
     }
   }

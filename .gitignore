@@ -6,3 +6,23 @@ build/
 dist/
 *.mid
 !tests/fixtures/*.mid
+
+# Environment / secrets
+.env
+.env.*
+*.key
+*.pem
+*.secret
+credentials
+.netrc
+
+# venv
+venv/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
