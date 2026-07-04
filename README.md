@@ -149,6 +149,70 @@ s = quantize_midi(s, grid="sixteenth")
 export_midi(s, "output.mid")
 ```
 
+## Example prompts for testing
+
+Single-tool prompts to verify each tool works in isolation:
+
+1. **Parse only** — "Load `song.mid` with parse_midi_file and tell me how many parts and measures it has."
+
+2. **Key detection** — "Use parse_midi_file to load `song.mid`, then analyze_key to tell me the key, mode, and confidence."
+
+3. **Export** — "Load `song.mid` with parse_midi_file and export it to `copy.mid` with export_midi. Did the file size match?"
+
+4. **Transpose** — "Parse `song.mid` and transpose it down 3 semitones. Export to `song_down.mid`."
+
+5. **Transpose to key** — "Load `song.mid`, detect its key, then transpose it to E minor. Export to `song_em.mid`."
+
+6. **Velocity** — "Parse `song.mid`, set all velocities to a fixed value of 90. Export to `song_vel90.mid`."
+
+7. **Velocity boost** — "Load `song.mid` and scale all velocities by 1.3 (clamped to 127). Export to `song_louder.mid`."
+
+8. **Filter notes** — "Parse `song.mid` and remove all notes below C3. Export to `song_no_bass.mid`."
+
+9. **Octave shift** — "Load `song.mid` and shift everything up 1 octave. Export to `song_oct_up.mid`."
+
+10. **Replace chord** — "Parse `song.mid` and replace the chord at bar 2, beat 1 with a C major triad. Export to `song_newchord.mid`."
+
+11. **Merge** — "Load `drums.mid` and `bass.mid`, merge them into a single file. Export to `drum_and_bass.mid`."
+
+12. **Quantize** — "Parse `song.mid` and quantize all timings to a sixteenth-note grid. Export to `song_quantized.mid`."
+
+13. **Reharmonize** — "Load `song.mid` and reharmonize the chord progression using jazz substitutions. Export to `song_jazz.mid`."
+
+14. **Harmonize** — "Parse `melody.mid` and generate block chord accompaniment from the melody line. Export to `melody_with_chords.mid`."
+
+15. **Chord analysis** — "Load `song.mid` and analyze the chord progression. Give me the chords and Roman numerals."
+
+16. **Extract melody** — "Parse `song.mid` and extract just the melody line. Export to `melody_only.mid`."
+
+17. **Detect modulations** — "Load `song.mid` and find all key changes. Tell me where each modulation happens."
+
+18. **Analyze form** — "Parse `song.mid` and identify the song structure (A, B, A' sections)."
+
+19. **Search pattern** — "Load `song.mid` and search for the pitch sequence C4-E4-G4. Tell me where it occurs."
+
+Multi-tool chains to test tool composition:
+
+20. **Full analysis** — "Load `song.mid`. Detect the key, analyze the chord progression, extract the melody, and analyze the song form. Give me a complete analysis report."
+
+21. **Transpose and harmonize** — "Parse `song.mid`, transpose up 5 semitones, then reharmonize the result with jazz substitutions. Export to `song_jazz_up.mid`."
+
+22. **Clean and quantize** — "Load `song.mid`, remove all notes below C2, quantize to an eighth-note grid, and scale velocities by 0.8. Export to `song_cleaned.mid`."
+
+23. **Melody extraction pipeline** — "Parse `song.mid`, extract the melody, harmonize it with block chords, and export to `melody_harmonized.mid`."
+
+24. **Key-aware reharm** — "Load `song.mid`, detect the key, then reharmonize using diatonic substitutions appropriate for that key. Export to `song_diatonic.mid`."
+
+25. **Modulation-aware transpose** — "Parse `song.mid`, detect all modulations, then transpose the whole piece so the first key becomes A minor. Export to `song_am.mid`."
+
+26. **Pattern search then replace** — "Load `song.mid`, search for the interval sequence [2, 2] (two whole steps up), and replace each match with a diminished triad. Export to `song_dim.mid`."
+
+27. **Form-aware analysis** — "Parse `song.mid`, analyze the form to find the B section, then extract just the melody from that section and harmonize it. Export to `b_section_harmonized.mid`."
+
+28. **Multi-file merge and clean** — "Load `drums.mid`, `bass.mid`, and `keys.mid`. Merge all three, quantize to a sixteenth grid, and scale velocities to 100. Export to `full_band.mid`."
+
+29. **End-to-end remix** — "Load `song.mid`. Detect key, transpose down 2 semitones, quantize to eighth notes, reharmonize with jazz substitutions, boost velocity by 1.4, and export to `song_remix.mid`."
+
 ## Architecture
 
 ```
