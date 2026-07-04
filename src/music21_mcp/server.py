@@ -19,6 +19,8 @@ from .tools.modify_notes import modify_notes
 from .tools.replace_chord_at import replace_chord_at
 from .tools.merge_midi import merge_midi
 from .tools.quantize_midi import quantize_midi
+from .tools.reharmonize import reharmonize
+from .tools.harmonize_melody import harmonize_melody
 
 mcp = FastMCP("music21-mcp")
 
@@ -60,6 +62,14 @@ _tool_registry: dict[str, dict] = {
     "quantize_midi": {
         "description": "Snap note timings to a rhythmic grid (quarter, eighth, sixteenth).",
         "fn": quantize_midi,
+    },
+    "reharmonize": {
+        "description": "Replace chords with harmonic alternatives (diatonic or jazz substitutions).",
+        "fn": reharmonize,
+    },
+    "harmonize_melody": {
+        "description": "Generate chord accompaniment for a melody line.",
+        "fn": harmonize_melody,
     },
 }
 
@@ -378,6 +388,80 @@ def mcp_quantize_midi(
             "notes_quantized": note_count,
             "grid": grid,
             "summary": f"Quantized {note_count} notes to {grid} grid, saved to {output_path}",
+        })
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@mcp.tool()
+def mcp_reharmonize(
+    file_path: str,
+    style: str = "diatonic",
+    output_path: str | None = None,
+) -> str:
+    """Reharmonize a chord progression in a MIDI file.
+
+    Args:
+        file_path: Path to input MIDI file
+        style: 'diatonic' (in-key substitutions) or 'substitute' (jazz substitutions)
+        output_path: Optional output path
+
+    Returns:
+        JSON with success status and chord changes
+    """
+    try:
+        stream_obj = parse_midi_file(file_path)
+        result = reharmonize(stream_obj, style=style)
+
+        if output_path is None:
+            output_path = file_path.replace(".mid", "_reharmonized.mid")
+        export_midi(result, output_path)
+
+        return json.dumps({
+            "success": True,
+            "output_path": output_path,
+            "style": style,
+            "summary": f"Reharmonized with {style} style, saved to {output_path}",
+        })
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@mcp.tool()
+def mcp_harmonize_melody(
+    file_path: str,
+    style: str = "block",
+    output_path: str | None = None,
+) -> str:
+    """Generate chord accompaniment for a melody in a MIDI file.
+
+    Args:
+        file_path: Path to input MIDI file (melody)
+        style: 'block' (homophonic chords) or 'arpeggiated'
+        output_path: Optional output path
+
+    Returns:
+        JSON with success status and chords added
+    """
+    try:
+        stream_obj = parse_midi_file(file_path)
+        result = harmonize_melody(stream_obj, style=style)
+
+        if output_path is None:
+            output_path = file_path.replace(".mid", "_harmonized.mid")
+        export_midi(result, output_path)
+
+        from music21 import chord as m21chord
+        chord_count = sum(
+            1 for e in result.recurse() if isinstance(e, m21chord.Chord)
+        )
+
+        return json.dumps({
+            "success": True,
+            "output_path": output_path,
+            "chords_added": chord_count,
+            "style": style,
+            "summary": f"Added {chord_count} chords ({style} style), saved to {output_path}",
         })
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
