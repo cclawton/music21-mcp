@@ -4,9 +4,14 @@ version = "0.1.0"
 description = "MCP server for music21 MIDI analysis and editing tools"
 dependencies = [
     "music21>=9.1.0",
-    "pytest>=8.0.0",
+    "mcp>=1.0.0",
 ]
 requires-python = ">=3.11"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
 
 [build-system]
 requires = ["setuptools>=61.0"]

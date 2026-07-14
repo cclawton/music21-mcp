@@ -48,11 +48,8 @@ cd music21-mcp
 python3 -m venv venv
 source venv/bin/activate
 
-# Install the package in editable mode
-pip install -e .
-
-# Install MCP server dependency
-pip install mcp
+# Install the package and test dependencies in editable mode
+pip install -e ".[dev]"
 ```
 
 ### Run tests

@@ -1,7 +1,0 @@
-Metadata-Version: 2.4
-Name: music21-mcp
-Version: 0.1.0
-Summary: MCP server for music21 MIDI analysis and editing tools
-Requires-Python: >=3.11
-Requires-Dist: music21>=9.1.0
-Requires-Dist: pytest>=8.0.0
