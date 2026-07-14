@@ -1,6 +1,8 @@
 # music21-mcp
 
-MCP server exposing 16 music21 MIDI analysis and editing tools to AI agents. Built spec-driven with TDD — 120 tests, all green.
+Symbolic music analysis and editing tools exposed through MCP, built on music21. The server works with user-supplied MIDI and supports analysis, transformation, and basic accompaniment generation.
+
+The current implementation registers 16 MCP tools and has 120 automated tests.
 
 ## What it does
 
@@ -12,6 +14,8 @@ Give an AI agent a MIDI file and it can:
 - **Analyze** — detect modulations, extract melody, identify song form, search for patterns
 
 ## Tools
+
+The MCP-facing names currently use an `mcp_` prefix, such as `mcp_analyze_key` and `mcp_transpose_midi`. The underlying Python functions use the unprefixed names shown below.
 
 | Phase | Tool | What it does |
 |-------|------|-------------|
@@ -64,7 +68,7 @@ pytest tests/test_transpose_midi.py -v
 
 ### Use as MCP server
 
-The server runs over stdio, compatible with any MCP-aware client (Claude Desktop, Cursor, etc).
+The server runs over stdio and is intended for MCP clients that support local stdio servers.
 
 ```bash
 # Start the server
@@ -154,7 +158,7 @@ Single-tool prompts to verify each tool works in isolation:
 
 2. **Key detection** — "Use parse_midi_file to load `song.mid`, then analyze_key to tell me the key, mode, and confidence."
 
-3. **Export** — "Load `song.mid` with parse_midi_file and export it to `copy.mid` with export_midi. Did the file size match?"
+3. **Export** — "Load `song.mid` with parse_midi_file and export it to `copy.mid` with export_midi. Report the output path."
 
 4. **Transpose** — "Parse `song.mid` and transpose it down 3 semitones. Export to `song_down.mid`."
 
@@ -202,11 +206,11 @@ Multi-tool chains to test tool composition:
 
 25. **Modulation-aware transpose** — "Parse `song.mid`, detect all modulations, then transpose the whole piece so the first key becomes A minor. Export to `song_am.mid`."
 
-26. **Pattern search then replace** — "Load `song.mid`, search for the interval sequence [2, 2] (two whole steps up), and replace each match with a diminished triad. Export to `song_dim.mid`."
+26. **Pattern search** — "Load `song.mid` and search for the interval sequence [2, 2] (two whole steps up). Report every matching offset."
 
-27. **Form-aware analysis** — "Parse `song.mid`, analyze the form to find the B section, then extract just the melody from that section and harmonize it. Export to `b_section_harmonized.mid`."
+27. **Form and melody analysis** — "Parse `song.mid`, analyze its form, then extract the full melody line and export it to `melody.mid`."
 
-28. **Multi-file merge and clean** — "Load `drums.mid`, `bass.mid`, and `keys.mid`. Merge all three, quantize to a sixteenth grid, and scale velocities to 100. Export to `full_band.mid`."
+28. **Multi-file merge and clean** — "Merge `drums.mid` and `bass.mid`, then merge that result with `keys.mid`. Quantize the combined file to a sixteenth grid, set velocities to 100, and export to `full_band.mid`."
 
 29. **End-to-end remix** — "Load `song.mid`. Detect key, transpose down 2 semitones, quantize to eighth notes, reharmonize with jazz substitutions, boost velocity by 1.4, and export to `song_remix.mid`."
 
@@ -238,7 +242,7 @@ tests/
     test_*.py          # One test file per tool, plus server + e2e tests
 ```
 
-Each tool is a pure function that takes a music21 Stream and returns a Stream or dict. The MCP server layer handles file-path-to-stream conversion and JSON serialization. This separation means tools are testable without the MCP protocol and usable as a plain Python library.
+Most editing and analysis functions operate on music21 streams. Parsing and export perform file I/O, while the MCP wrappers accept file paths and return JSON strings. This keeps the domain logic independently testable.
 
 ## Tech
 
